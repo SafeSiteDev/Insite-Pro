@@ -121,7 +121,7 @@
         }
         .chart-container {
             position: relative;
-            height: 25vh; 
+            height: 25vh;
             width: 100%;
         }
         @media (max-width: 600px) {
@@ -219,8 +219,7 @@
             </div>
         </div>
     </div>
-
-    <h2>Incident Timeline</h2>
+<h2>Incident Timeline</h2>
     <div class="incident-timeline" id="incidentTimeline"></div>
 
     <h2>Feedback</h2>
@@ -250,13 +249,16 @@
         const incidents = JSON.parse(localStorage.getItem('incidents')) || [];
         const comments = JSON.parse(localStorage.getItem('comments')) || [];
         const feedbacks = JSON.parse(localStorage.getItem('feedbacks')) || [];
+        let map;
 
-        // Initialize the map
-        const map = L.map('map').setView([0, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-        }).addTo(map);
+        function initMap() {
+            map = L.map('map').setView([0, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+            }).addTo(map);
+        }
 
+        initMap();
         renderIncidents();
         updateMap();
         renderComments();
@@ -289,40 +291,37 @@
                     lng: position.coords.longitude
                 };
 
-                const attachmentsPreview = document.getElementById('attachmentsPreview');
-                attachmentsPreview.innerHTML = '';
-
-                const files = document.getElementById('incidentAttachment').files;
-                for (const file of files) {
-                    incident.attachments.push(file.name);
-                    
-                    const img = document.createElement('img');
-                    img.src = URL.createObjectURL(file);
-                    img.style.maxWidth = '100px';
-                    img.style.maxHeight = '100px';
-                    img.style.marginRight = '10px';
-                    attachmentsPreview.appendChild(img);
-                }
-
-                incidents.push(incident);
-                localStorage.setItem('incidents', JSON.stringify(incidents));
-                renderIncidents();
-                showNotification('Incident reported successfully!');
-                updateMap();
-                updateAnalytics();
-                clearForm();
+                saveIncident(incident);
             }, error => {
                 console.error('Error getting location:', error);
-                incident.coordinates = {lat: null, lng: null};
-                incidents.push(incident);
-                localStorage.setItem('incidents', JSON.stringify(incidents));
-                renderIncidents();
-                showNotification('Incident reported successfully! Location not available.');
-                updateMap();
-                updateAnalytics();
-                clearForm();
+                saveIncident(incident);
             });
         });
+
+        function saveIncident(incident) {
+            const attachmentsPreview = document.getElementById('attachmentsPreview');
+            attachmentsPreview.innerHTML = '';
+
+            const files = document.getElementById('incidentAttachment').files;
+            for (const file of files) {
+                incident.attachments.push(file.name);
+                
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                img.style.maxWidth = '100px';
+                img.style.maxHeight = '100px';
+                img.style.marginRight = '10px';
+                attachmentsPreview.appendChild(img);
+            }
+
+            incidents.push(incident);
+            localStorage.setItem('incidents', JSON.stringify(incidents));
+            renderIncidents();
+            showNotification('Incident reported successfully!');
+            updateMap();
+            updateAnalytics();
+            clearForm();
+        }
 
         function renderIncidents() {
             const incidentList = document.getElementById('incidentList');
@@ -374,8 +373,7 @@
         }
 
         function showTimeline(index) {
-            const time</antArtifact>
- lineDiv = document.getElementById('incidentTimeline');
+            const timelineDiv = document.getElementById('incidentTimeline');
             timelineDiv.innerHTML = '';
 
             const incident = incidents[index];
