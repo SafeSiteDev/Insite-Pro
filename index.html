@@ -210,7 +210,7 @@
         </div>
         <div>
             <h3>Incidents by Type</h3>
-            <span id="incidentsByType">0</span>
+            <div id="incidentsByType"></div>
         </div>
         <div>
             <h3>Trends Over Time</h3>
@@ -246,13 +246,14 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
     <script>
-        const incidents = JSON.parse(localStorage.getItem('incidents')) || [];
-        const comments = JSON.parse(localStorage.getItem('comments')) || [];
-        const feedbacks = JSON.parse(localStorage.getItem('feedbacks')) || [];
+        let incidents = JSON.parse(localStorage.getItem('incidents')) || [];
+        let comments = JSON.parse(localStorage.getItem('comments')) || [];
+        let feedbacks = JSON.parse(localStorage.getItem('feedbacks')) || [];
         let map;
+        let chart;
 
         function initMap() {
-            map = L.map('map').setView([0, 0], 2);
+            map = L.map('map');
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
             }).addTo(map);
@@ -416,7 +417,13 @@
                 return acc;
             }, {});
 
-            document.getElementById('incidentsByType').textContent = JSON.stringify(incidentsByType);
+            const incidentsByTypeDiv = document.getElementById('incidentsByType');
+            incidentsByTypeDiv.innerHTML = '';
+            for (const type in incidentsByType) {
+                const typeCount = document.createElement('div');
+                typeCount.textContent = `${type}: ${incidentsByType[type]}`;
+                incidentsByTypeDiv.appendChild(typeCount);
+            }
 
             // Update Incident Trend Chart
             const trendLabels = [];
@@ -433,7 +440,10 @@
             });
 
             const ctx = document.getElementById('incidentTrendChart').getContext('2d');
-            new Chart(ctx, {
+            if (chart) {
+                chart.destroy();
+            }
+            chart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: trendLabels,
@@ -502,12 +512,22 @@
         }
 
         function updateMap() {
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+
             incidents.forEach(incident => {
                 if (incident.coordinates.lat && incident.coordinates.lng) {
                     const marker = L.marker([incident.coordinates.lat, incident.coordinates.lng]).addTo(map);
                     marker.bindPopup(`<strong>${incident.officer}</strong>: ${incident.type} - ${incident.description}`);
                 }
             });
+
+            if (incidents.length > 0 && incidents[incidents.length - 1].coordinates.lat && incidents[incidents.length - 1].coordinates.lng) {
+                map.setView([incidents[incidents.length - 1].coordinates.lat, incidents[incidents.length - 1].coordinates.lng], 13);
+            }
         }
 
         function clearForm() {
