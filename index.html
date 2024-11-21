@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>InSite Pro - Incident Management Dashboard</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -109,11 +109,11 @@
         }
         .analytics {
             display: flex;
-            flex-direction: column; /* Stack vertically */
+            flex-direction: column;
             margin-bottom: 20px;
         }
         .analytics div {
-            margin-bottom: 10px; /* Space out analytics sections */
+            margin-bottom: 10px;
             background: #333;
             border-radius: 5px;
             padding: 10px;
@@ -121,7 +121,7 @@
         }
         .chart-container {
             position: relative;
-            height: 25vh; /* Reduced height for better scrolling */
+            height: 25vh; 
             width: 100%;
         }
         @media (max-width: 600px) {
@@ -243,8 +243,9 @@
     <div class="footer">
         "Safe Site Security - Protecting what matters most"
     </div>
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
     <script>
         const incidents = JSON.parse(localStorage.getItem('incidents')) || [];
         const comments = JSON.parse(localStorage.getItem('comments')) || [];
@@ -277,7 +278,7 @@
                 status: 'Open',
                 createdAt: new Date().toISOString(),
                 history: [],
-                coordinates: {},
+                coordinates: {lat: null, lng: null},
                 attachments: []
             };
 
@@ -287,10 +288,20 @@
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
-                
+
+                const attachmentsPreview = document.getElementById('attachmentsPreview');
+                attachmentsPreview.innerHTML = '';
+
                 const files = document.getElementById('incidentAttachment').files;
                 for (const file of files) {
-                    incident.attachments.push(file);
+                    incident.attachments.push(file.name);
+                    
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(file);
+                    img.style.maxWidth = '100px';
+                    img.style.maxHeight = '100px';
+                    img.style.marginRight = '10px';
+                    attachmentsPreview.appendChild(img);
                 }
 
                 incidents.push(incident);
@@ -300,8 +311,16 @@
                 updateMap();
                 updateAnalytics();
                 clearForm();
-            }, () => {
-                showNotification('Unable to retrieve location.');
+            }, error => {
+                console.error('Error getting location:', error);
+                incident.coordinates = {lat: null, lng: null};
+                incidents.push(incident);
+                localStorage.setItem('incidents', JSON.stringify(incidents));
+                renderIncidents();
+                showNotification('Incident reported successfully! Location not available.');
+                updateMap();
+                updateAnalytics();
+                clearForm();
             });
         });
 
@@ -355,7 +374,8 @@
         }
 
         function showTimeline(index) {
-            const timelineDiv = document.getElementById('incidentTimeline');
+            const time</antArtifact>
+ lineDiv = document.getElementById('incidentTimeline');
             timelineDiv.innerHTML = '';
 
             const incident = incidents[index];
@@ -385,8 +405,8 @@
             const notification = document.getElementById('notification');
             notification.textContent = message;
             notification.style.opacity = '1';
-            setTimeout(() => { 
-                notification.style.opacity = '0'; 
+            setTimeout(() => {
+                notification.style.opacity = '0';
             }, 3000);
         }
 
@@ -431,7 +451,10 @@
                     responsive: true,
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
                         }
                     }
                 }
@@ -440,8 +463,8 @@
 
         // Comments Section
         document.getElementById('addCommentButton').addEventListener('click', function() {
-            const commentText = document.getElementById('commentText').value;
-            if (commentText) {
+            const commentText = document.getElementById('commentText').value.trim();
+            if (commentText !== '') {
                 comments.push({ text: commentText, date: new Date().toLocaleString() });
                 localStorage.setItem('comments', JSON.stringify(comments));
                 renderComments();
@@ -461,8 +484,8 @@
 
         // Feedback Section
         document.getElementById('addFeedbackButton').addEventListener('click', function() {
-            const feedbackText = document.getElementById('feedbackText').value;
-            if (feedbackText) {
+            const feedbackText = document.getElementById('feedbackText').value.trim();
+            if (feedbackText !== '') {
                 feedbacks.push({ text: feedbackText, date: new Date().toLocaleString() });
                 localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
                 renderFeedbacks();
@@ -482,8 +505,10 @@
 
         function updateMap() {
             incidents.forEach(incident => {
-                const marker = L.marker([incident.coordinates.lat, incident.coordinates.lng]).addTo(map);
-                marker.bindPopup(`<strong>${incident.officer}</strong>: ${incident.type} - ${incident.description}`);
+                if (incident.coordinates.lat && incident.coordinates.lng) {
+                    const marker = L.marker([incident.coordinates.lat, incident.coordinates.lng]).addTo(map);
+                    marker.bindPopup(`<strong>${incident.officer}</strong>: ${incident.type} - ${incident.description}`);
+                }
             });
         }
 
