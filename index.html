@@ -54,7 +54,7 @@
             margin-bottom: 30px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
-        input, select, textarea, button {
+        input, select, textarea {
             width: calc(100% - 20px);
             margin-bottom: 15px;
             padding: 10px;
@@ -70,9 +70,13 @@
             outline: none;
         }
         button {
+            width: calc(100% - 20px);
+            padding: 10px;
             background: linear-gradient(135deg, #cc0000, #990000);
+            color: #ffffff;
             cursor: pointer;
             border: none;
+            border-radius: 5px;
             transition: transform 0.2s;
         }
         button:hover {
@@ -85,10 +89,16 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
         .notification {
-            color: #00ff00;
-            margin-top: 10px;
-            font-weight: bold;
-            text-align: center;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background-color: #00ff00;
+            color: #000;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: opacity 0.3s;
         }
         .incident {
             margin-bottom: 20px;
@@ -110,18 +120,11 @@
         .analytics {
             display: flex;
             flex-direction: column;
-            margin-bottom: 20px;
-        }
-        .analytics div {
-            margin-bottom: 10px;
-            background: #333;
-            border-radius: 5px;
-            padding: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            gap: 20px;
         }
         .chart-container {
             position: relative;
-            height: 25vh;
+            height: 300px;
             width: 100%;
         }
         @media (max-width: 600px) {
@@ -135,6 +138,15 @@
                 font-size: 1.5em;
             }
         }
+        .incident-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .incident-actions button {
+            flex: 1;
+            width: auto;
+        }
     </style>
 </head>
 <body>
@@ -143,7 +155,7 @@
     <div class="subtitle">By Safe Site Security</div>
 
     <h2>Report Incident</h2>
-    <form id="incidentForm">
+    <form id="incidentForm" onsubmit="handleIncidentSubmit(event)">
         <input type="text" id="officerName" placeholder="Officer's Name" required />
         <select id="incidentType" required>
             <option value="">Select Incident Type</option>
@@ -168,14 +180,7 @@
         </select>
         <textarea id="incidentDescription" placeholder="Describe the incident..." required></textarea>
         <input type="text" id="incidentLocation" placeholder="Location" required />
-        <input type="file" id="incidentAttachment" multiple />
-        <select id="incidentPriority" required>
-            <option value="">Select Priority</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-        </select>
+        <input type="file" id="incidentAttachment" multiple accept="image/*" />
         <button type="submit">Report Incident</button>
     </form>
 
@@ -185,22 +190,21 @@
     <h2>Incident Filters</h2>
     <div class="filter">
         <input type="text" id="searchBar" placeholder="Search incidents..." />
-        <input type="date" id="startDate" placeholder="Start Date" />
-        <input type="date" id="endDate" placeholder="End Date" />
+        <input type="date" id="startDate" />
+        <input type="date" id="endDate" />
         <select id="filterStatus">
             <option value="">Filter by Status</option>
             <option value="Open">Open</option>
             <option value="In Progress">In Progress</option>
             <option value="Resolved">Resolved</option>
         </select>
-        <button id="exportButton">Export to CSV</button>
-        <button id="bulkUpdateButton">Bulk Update Status</button>
+        <button onclick="exportToCSV()">Export to CSV</button>
     </div>
 
     <h2>Reported Incidents</h2>
-    <ul id="incidentList"></ul>
+    <div id="incidentList"></div>
 
-    <div class="notification" id="notification"></div>
+    <div id="notification" class="notification"></div>
 
     <h2>Incident Analytics</h2>
     <div class="analytics">
@@ -212,64 +216,69 @@
             <h3>Incidents by Type</h3>
             <div id="incidentsByType"></div>
         </div>
-        <div>
-            <h3>Trends Over Time</h3>
-            <div class="chart-container">
-                <canvas id="incidentTrendChart"></canvas>
-            </div>
+        <div class="chart-container">
+            <canvas id="incidentTrendChart"></canvas>
         </div>
-    </div>
-<h2>Incident Timeline</h2>
-    <div class="incident-timeline" id="incidentTimeline"></div>
-
-    <h2>Feedback</h2>
-    <div class="feedback-section">
-        <textarea id="feedbackText" placeholder="Provide feedback on the incident resolution..."></textarea>
-        <button id="addFeedbackButton">Submit Feedback</button>
-        <ul id="feedbackList"></ul>
-    </div>
-
-    <h2>Comments</h2>
-    <div class="comments-section">
-        <textarea id="commentText" placeholder="Add a comment..."></textarea>
-        <button id="addCommentButton">Add Comment</button>
-        <ul id="commentsList"></ul>
     </div>
 
     <h2>Patrol Route</h2>
     <div id="map"></div>
 
     <div class="footer">
-        "Safe Site Security - Protecting what matters most"
+        Safe Site Security - Protecting what matters most
     </div>
-    
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
-    <script>
+
+<script>
+        // Initialize variables
         let incidents = JSON.parse(localStorage.getItem('incidents')) || [];
-        let comments = JSON.parse(localStorage.getItem('comments')) || [];
-        let feedbacks = JSON.parse(localStorage.getItem('feedbacks')) || [];
         let map;
         let chart;
 
+        // Initialize the map with default US coordinates
         function initMap() {
-            map = L.map('map');
+            map = L.map('map').setView([37.0902, -95.7129], 4); // US center coordinates
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
             }).addTo(map);
         }
 
-        initMap();
-        renderIncidents();
-        updateMap();
-        renderComments();
-        renderFeedbacks();
-        updateAnalytics();
+        // Initialize everything when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            renderIncidents();
+            updateMap();
+            updateAnalytics();
+        });
 
-        // Form submission handling
-        document.getElementById('incidentForm').addEventListener('submit', function(e) {
+        // Handle file preview
+        document.getElementById('incidentAttachment').addEventListener('change', function(e) {
+            const preview = document.getElementById('attachmentsPreview');
+            preview.innerHTML = '';
+            
+            [...e.target.files].forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.style.maxWidth = '100px';
+                        img.style.margin = '5px';
+                        preview.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+
+        // Handle form submission
+        function handleIncidentSubmit(e) {
             e.preventDefault();
+            
             const incident = {
+                id: Date.now(),
                 officer: document.getElementById('officerName').value,
                 type: document.getElementById('incidentType').value,
                 subType: document.getElementById('incidentSubType').value,
@@ -277,127 +286,37 @@
                 severity: document.getElementById('incidentSeverity').value,
                 description: document.getElementById('incidentDescription').value,
                 location: document.getElementById('incidentLocation').value,
-                priority: document.getElementById('incidentPriority').value,
                 status: 'Open',
                 createdAt: new Date().toISOString(),
-                history: [],
-                coordinates: {lat: null, lng: null},
-                attachments: []
+                history: []
             };
 
-            // Get current user location
-            navigator.geolocation.getCurrentPosition(position => {
-                incident.coordinates = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
-
-                saveIncident(incident);
-            }, error => {
-                console.error('Error getting location:', error);
-                saveIncident(incident);
-            });
-        });
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    incident.coordinates = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    saveIncident(incident);
+                },
+                error => {
+                    // Default to current location input's geocoding if available
+                    // For demo, defaulting to US coordinates if geolocation fails
+                    incident.coordinates = { lat: 37.0902, lng: -95.7129 };
+                    saveIncident(incident);
+                }
+            );
+        }
 
         function saveIncident(incident) {
-            const attachmentsPreview = document.getElementById('attachmentsPreview');
-            attachmentsPreview.innerHTML = '';
-
-            const files = document.getElementById('incidentAttachment').files;
-            for (const file of files) {
-                incident.attachments.push(file.name);
-                
-                const img = document.createElement('img');
-                img.src = URL.createObjectURL(file);
-                img.style.maxWidth = '100px';
-                img.style.maxHeight = '100px';
-                img.style.marginRight = '10px';
-                attachmentsPreview.appendChild(img);
-            }
-
             incidents.push(incident);
             localStorage.setItem('incidents', JSON.stringify(incidents));
             renderIncidents();
+            updateMap();
+            updateAnalytics();
             showNotification('Incident reported successfully!');
-            updateMap();
-            updateAnalytics();
-            clearForm();
-        }
-
-        function renderIncidents() {
-            const incidentList = document.getElementById('incidentList');
-            incidentList.innerHTML = '';
-            const searchTerm = document.getElementById('searchBar').value.toLowerCase();
-            const startDate = new Date(document.getElementById('startDate').value);
-            const endDate = new Date(document.getElementById('endDate').value);
-            const filterStatus = document.getElementById('filterStatus').value;
-
-            const filteredIncidents = incidents.filter(incident => {
-                const matchesSearch = incident.description.toLowerCase().includes(searchTerm) || incident.location.toLowerCase().includes(searchTerm);
-                const withinDateRange = (!startDate || new Date(incident.createdAt) >= startDate) && (!endDate || new Date(incident.createdAt) <= endDate);
-                const matchesStatus = filterStatus ? incident.status === filterStatus : true;
-                return matchesSearch && withinDateRange && matchesStatus;
-            });
-
-            filteredIncidents.forEach((incident, index) => {
-                const li = document.createElement('li');
-                li.classList.add('incident');
-                li.innerHTML = `
-                    <strong>${incident.officer}</strong>: ${incident.type} - ${incident.subType} at ${incident.location} on ${new Date(incident.createdAt).toLocaleString()} <br>
-                    Severity: ${incident.severity} | Priority: ${incident.priority} | Status: ${incident.status}
-                    <div class="history">History: ${incident.history.map(h => `${h.date} - ${h.action}`).join(', ')}</div>
-                    <button onclick="showTimeline(${index})">View Timeline</button>
-                    <div style="margin-top: 10px;">
-                        <button onclick="updateIncidentStatus(${index}, 'In Progress')">In Progress</button>
-                        <button onclick="updateIncidentStatus(${index}, 'Resolved')">Resolve</button>
-                        <button onclick="deleteIncident(${index})">Delete</button>
-                    </div>
-                `;
-                incidentList.appendChild(li);
-            });
-
-            updateAnalytics();
-        }
-
-        document.getElementById('filterStatus').addEventListener('change', renderIncidents);
-        document.getElementById('searchBar').addEventListener('input', renderIncidents);
-        document.getElementById('startDate').addEventListener('change', renderIncidents);
-        document.getElementById('endDate').addEventListener('change', renderIncidents);
-
-        function updateIncidentStatus(index, status) {
-            incidents[index].status = status;
-            incidents[index].history.push({ date: new Date().toLocaleString(), action: `Status changed to ${status}` });
-            localStorage.setItem('incidents', JSON.stringify(incidents));
-            renderIncidents();
-            showNotification(`Incident status updated to ${status}.`);
-            updateMap();
-        }
-
-        function showTimeline(index) {
-            const timelineDiv = document.getElementById('incidentTimeline');
-            timelineDiv.innerHTML = '';
-
-            const incident = incidents[index];
-            const timelineHeader = document.createElement('h3');
-            timelineHeader.textContent = `Timeline for Incident: ${incident.officer} - ${incident.type}`;
-            timelineDiv.appendChild(timelineHeader);
-
-            const timelineList = document.createElement('ul');
-            incident.history.forEach(event => {
-                const li = document.createElement('li');
-                li.textContent = `${event.date}: ${event.action}`;
-                timelineList.appendChild(li);
-            });
-
-            timelineDiv.appendChild(timelineList);
-        }
-
-        function deleteIncident(index) {
-            incidents.splice(index, 1);
-            localStorage.setItem('incidents', JSON.stringify(incidents));
-            renderIncidents();
-            updateMap();
-            showNotification('Incident deleted successfully!');
+            document.getElementById('incidentForm').reset();
+            document.getElementById('attachmentsPreview').innerHTML = '';
         }
 
         function showNotification(message) {
@@ -409,9 +328,105 @@
             }, 3000);
         }
 
+        function renderIncidents() {
+            const incidentList = document.getElementById('incidentList');
+            incidentList.innerHTML = '';
+            
+            const searchTerm = document.getElementById('searchBar').value.toLowerCase();
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const filterStatus = document.getElementById('filterStatus').value;
+
+            incidents
+                .filter(incident => {
+                    const matchesSearch = incident.description.toLowerCase().includes(searchTerm) ||
+                                       incident.location.toLowerCase().includes(searchTerm);
+                    const matchesDate = (!startDate || incident.dateTime >= startDate) &&
+                                      (!endDate || incident.dateTime <= endDate);
+                    const matchesStatus = !filterStatus || incident.status === filterStatus;
+                    return matchesSearch && matchesDate && matchesStatus;
+                })
+                .forEach((incident, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'incident';
+                    div.innerHTML = `
+                        <strong>${incident.officer}</strong>: ${incident.type} - ${incident.subType}
+                        <br>Location: ${incident.location}
+                        <br>Date: ${new Date(incident.dateTime).toLocaleString()}
+                        <br>Status: ${incident.status}
+                        <br>Severity: ${incident.severity}
+                        <div class="incident-actions">
+                            <button onclick="updateIncidentStatus(${incident.id}, 'In Progress')">Mark In Progress</button>
+                            <button onclick="updateIncidentStatus(${incident.id}, 'Resolved')">Mark Resolved</button>
+                            <button onclick="deleteIncident(${incident.id})">Delete</button>
+                        </div>
+                    `;
+                    incidentList.appendChild(div);
+                });
+        }
+
+        function updateIncidentStatus(incidentId, status) {
+            const index = incidents.findIndex(inc => inc.id === incidentId);
+            if (index !== -1) {
+                incidents[index].status = status;
+                incidents[index].history.push({
+                    date: new Date().toLocaleString(),
+                    action: `Status changed to ${status}`
+                });
+                localStorage.setItem('incidents', JSON.stringify(incidents));
+                renderIncidents();
+                updateAnalytics();
+                showNotification(`Incident status updated to ${status}`);
+            }
+        }
+
+        function deleteIncident(incidentId) {
+            if (confirm('Are you sure you want to delete this incident?')) {
+                const index = incidents.findIndex(inc => inc.id === incidentId);
+                if (index !== -1) {
+                    incidents.splice(index, 1);
+                    localStorage.setItem('incidents', JSON.stringify(incidents));
+                    renderIncidents();
+                    updateMap();
+                    updateAnalytics();
+                    showNotification('Incident deleted successfully');
+                }
+            }
+        }
+
+        function updateMap() {
+            // Clear existing markers
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            // Add markers for all incidents
+            incidents.forEach(incident => {
+                if (incident.coordinates?.lat && incident.coordinates?.lng) {
+                    const marker = L.marker([incident.coordinates.lat, incident.coordinates.lng]).addTo(map);
+                    marker.bindPopup(`<strong>${incident.officer}</strong>: ${incident.type} - ${incident.description}`);
+                }
+            });
+
+            // Center map on the most recent incident or adjust bounds to show all incidents
+            if (incidents.length > 0) {
+                const bounds = incidents
+                    .filter(inc => inc.coordinates?.lat && inc.coordinates?.lng)
+                    .map(inc => [inc.coordinates.lat, inc.coordinates.lng]);
+                
+                if (bounds.length > 0) {
+                    map.fitBounds(bounds);
+                }
+            }
+        }
+
         function updateAnalytics() {
+            // Update total incidents count
             document.getElementById('totalIncidents').textContent = incidents.length;
 
+            // Update incidents by type
             const incidentsByType = incidents.reduce((acc, incident) => {
                 acc[incident.type] = (acc[incident.type] || 0) + 1;
                 return acc;
@@ -419,49 +434,66 @@
 
             const incidentsByTypeDiv = document.getElementById('incidentsByType');
             incidentsByTypeDiv.innerHTML = '';
-            for (const type in incidentsByType) {
-                const typeCount = document.createElement('div');
-                typeCount.textContent = `${type}: ${incidentsByType[type]}`;
-                incidentsByTypeDiv.appendChild(typeCount);
-            }
-
-            // Update Incident Trend Chart
-            const trendLabels = [];
-            const trendData = [];
-
-            incidents.forEach(incident => {
-                const date = new Date(incident.createdAt).toLocaleDateString();
-                if (!trendLabels.includes(date)) {
-                    trendLabels.push(date);
-                    trendData.push(1);
-                } else {
-                    trendData[trendLabels.indexOf(date)]++;
-                }
+            Object.entries(incidentsByType).forEach(([type, count]) => {
+                const div = document.createElement('div');
+                div.textContent = `${type}: ${count}`;
+                incidentsByTypeDiv.appendChild(div);
             });
 
+            // Update chart
             const ctx = document.getElementById('incidentTrendChart').getContext('2d');
+            
+            // Destroy existing chart if it exists
             if (chart) {
                 chart.destroy();
             }
+
+            // Group incidents by date
+            const incidentsByDate = incidents.reduce((acc, incident) => {
+                const date = new Date(incident.dateTime).toLocaleDateString();
+                acc[date] = (acc[date] || 0) + 1;
+                return acc;
+            }, {});
+
+            // Create chart
             chart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: trendLabels,
+                    labels: Object.keys(incidentsByDate),
                     datasets: [{
-                        label: 'Incidents Over Time',
-                        data: trendData,
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        borderWidth: 1,
+                        label: 'Incidents per Day',
+                        data: Object.values(incidentsByDate),
+                        borderColor: '#cc0000',
+                        backgroundColor: 'rgba(204, 0, 0, 0.2)',
+                        tension: 0.4
                     }]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     scales: {
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                precision: 0
+                                color: '#ffffff'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#ffffff'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
                             }
                         }
                     }
@@ -469,70 +501,31 @@
             });
         }
 
-        // Comments Section
-        document.getElementById('addCommentButton').addEventListener('click', function() {
-            const commentText = document.getElementById('commentText').value.trim();
-            if (commentText !== '') {
-                comments.push({ text: commentText, date: new Date().toLocaleString() });
-                localStorage.setItem('comments', JSON.stringify(comments));
-                renderComments();
-                document.getElementById('commentText').value = '';
-            }
-        });
-
-        function renderComments() {
-            const commentsList = document.getElementById('commentsList');
-            commentsList.innerHTML = '';
-            comments.forEach(comment => {
-                const li = document.createElement('li');
-                li.textContent = `${comment.date}: ${comment.text}`;
-                commentsList.appendChild(li);
-            });
-        }
-
-        // Feedback Section
-        document.getElementById('addFeedbackButton').addEventListener('click', function() {
-            const feedbackText = document.getElementById('feedbackText').value.trim();
-            if (feedbackText !== '') {
-                feedbacks.push({ text: feedbackText, date: new Date().toLocaleString() });
-                localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
-                renderFeedbacks();
-                document.getElementById('feedbackText').value = '';
-            }
-        });
-
-        function renderFeedbacks() {
-            const feedbackList = document.getElementById('feedbackList');
-            feedbackList.innerHTML = '';
-            feedbacks.forEach(feedback => {
-                const li = document.createElement('li');
-                li.textContent = `${feedback.date}: ${feedback.text}`;
-                feedbackList.appendChild(li);
-            });
-        }
-
-        function updateMap() {
-            map.eachLayer(layer => {
-                if (layer instanceof L.Marker) {
-                    map.removeLayer(layer);
-                }
-            });
+        function exportToCSV() {
+            const csvRows = [];
+            const headers = ['Officer', 'Type', 'SubType', 'DateTime', 'Severity', 'Location', 'Status', 'Description'];
+            csvRows.push(headers.join(','));
 
             incidents.forEach(incident => {
-                if (incident.coordinates.lat && incident.coordinates.lng) {
-                    const marker = L.marker([incident.coordinates.lat, incident.coordinates.lng]).addTo(map);
-                    marker.bindPopup(`<strong>${incident.officer}</strong>: ${incident.type} - ${incident.description}`);
-                }
+                const row = [
+                    incident.officer,
+                    incident.type,
+                    incident.subType,
+                    incident.dateTime,
+                    incident.severity,
+                    incident.location,
+                    incident.status,
+                    `"${incident.description.replace(/"/g, '""')}"`
+                ];
+                csvRows.push(row.join(','));
             });
 
-            if (incidents.length > 0 && incidents[incidents.length - 1].coordinates.lat && incidents[incidents.length - 1].coordinates.lng) {
-                map.setView([incidents[incidents.length - 1].coordinates.lat, incidents[incidents.length - 1].coordinates.lng], 13);
-            }
-        }
-
-        function clearForm() {
-            document.getElementById('incidentForm').reset();
-            document.getElementById('attachmentsPreview').innerHTML = '';
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'incidents.csv';
+            link.click();
         }
     </script>
 </body>
